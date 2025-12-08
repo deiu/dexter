@@ -1,12 +1,7 @@
-import OpenAI from "openai";
+import { ChatOpenAI } from "@langchain/openai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { ZodTypeAny } from "zod";
 import { DEFAULT_MODEL } from "./state.js";
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 /**
  * Tool definition for OpenAI function calling
@@ -41,7 +36,17 @@ interface CallLlmOptions {
 }
 
 /**
- * Call OpenAI API directly
+ * Get a ChatOpenAI instance
+ */
+export function getModel(modelName: string = DEFAULT_MODEL): ChatOpenAI {
+  return new ChatOpenAI({
+    modelName,
+    temperature: 0,
+  });
+}
+
+/**
+ * Call OpenAI API using LangChain ChatOpenAI
  */
 export async function callLlm(
   prompt: string,
@@ -54,79 +59,52 @@ export async function callLlm(
     tools,
   } = options;
 
-  const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: prompt },
+  const llm = new ChatOpenAI({
+    modelName: model,
+    temperature: 0,
+  });
+
+  const messages = [
+    { role: "system" as const, content: systemPrompt },
+    { role: "user" as const, content: prompt },
   ];
 
   try {
-    // If structured output is requested, use JSON mode with schema in prompt
+    // If structured output is requested, use withStructuredOutput
     if (outputSchema) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const jsonSchema = zodToJsonSchema(outputSchema as any, {
-        $refStrategy: "none",
-      });
-
-      // Add schema to system prompt for guidance
-      const schemaPrompt = `${systemPrompt}
-
-You must respond with valid JSON matching this schema:
-${JSON.stringify(jsonSchema, null, 2)}`;
-
-      const response = await openai.chat.completions.create({
-        model,
-        messages: [
-          { role: "system", content: schemaPrompt },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      });
-
-      const content = response.choices[0].message.content;
-      return content ? JSON.parse(content) : null;
+      const structuredLlm = llm.withStructuredOutput(outputSchema);
+      const response = await structuredLlm.invoke(messages);
+      return response;
     }
 
-    // If tools are provided, use function calling
+    // If tools are provided, use bindTools
     if (tools && tools.length > 0) {
-      const openaiTools: OpenAI.ChatCompletionTool[] = tools.map((tool) => ({
+      const openaiTools = tools.map((tool) => ({
         type: "function" as const,
         function: {
           name: tool.name,
           description: tool.description,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          parameters: zodToJsonSchema(tool.schema as any, {
+          parameters: zodToJsonSchema(tool.schema as ZodTypeAny, {
             $refStrategy: "none",
           }) as Record<string, unknown>,
         },
       }));
 
-      const response = await openai.chat.completions.create({
-        model,
-        messages,
-        tools: openaiTools,
-      });
+      const modelWithTools = llm.bindTools(openaiTools);
+      const response = await modelWithTools.invoke(messages);
 
-      const message = response.choices[0].message;
       const toolCalls: ToolCall[] = [];
-
-      // Handle tool calls - check for the tool_calls array
-      if (message.tool_calls && Array.isArray(message.tool_calls)) {
-        for (const tc of message.tool_calls) {
-          // Access function property safely
-          const func = (
-            tc as { function?: { name: string; arguments: string } }
-          ).function;
-          if (func) {
-            toolCalls.push({
-              name: func.name,
-              args: JSON.parse(func.arguments),
-            });
-          }
+      if (response.tool_calls && Array.isArray(response.tool_calls)) {
+        for (const tc of response.tool_calls) {
+          toolCalls.push({
+            name: tc.name,
+            args: tc.args as Record<string, unknown>,
+          });
         }
       }
 
       const result: LlmResponse = {
-        content: message.content,
+        content: typeof response.content === "string" ? response.content : null,
         toolCalls,
       };
 
@@ -134,43 +112,10 @@ ${JSON.stringify(jsonSchema, null, 2)}`;
     }
 
     // Simple completion without tools or structured output
-    const response = await openai.chat.completions.create({
-      model,
-      messages,
-    });
-
-    return response.choices[0].message.content || "";
+    const response = await llm.invoke(messages);
+    return typeof response.content === "string" ? response.content : "";
   } catch (error) {
     console.error("OpenAI API Error:", error);
     throw error;
-  }
-}
-
-/**
- * Call OpenAI API with streaming response
- */
-export async function* callLlmStream(
-  prompt: string,
-  options: { model?: string; systemPrompt?: string } = {},
-): AsyncGenerator<string> {
-  const {
-    model = DEFAULT_MODEL,
-    systemPrompt = "You are a helpful assistant.",
-  } = options;
-
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: prompt },
-    ],
-    stream: true,
-  });
-
-  for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content;
-    if (content) {
-      yield content;
-    }
   }
 }

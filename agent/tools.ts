@@ -16,6 +16,13 @@ import {
   getNews,
   getAnalystEstimates,
   getSegmentedRevenues,
+  getInsiderTrades,
+  getInstitutionalOwnership,
+  getCompanyFacts,
+  getEarningsPressReleases,
+  searchLineItems,
+  searchFinancials,
+  getCryptoPrices,
 } from "../src/tools/finance/index.js";
 import { searchGoogleNews } from "../src/tools/search/index.js";
 
@@ -38,6 +45,13 @@ export const LANGCHAIN_TOOLS: StructuredToolInterface[] = [
   getNews,
   getAnalystEstimates,
   getSegmentedRevenues,
+  getInsiderTrades,
+  getInstitutionalOwnership,
+  getCompanyFacts,
+  getEarningsPressReleases,
+  searchLineItems,
+  searchFinancials,
+  getCryptoPrices,
   searchGoogleNews,
 ];
 

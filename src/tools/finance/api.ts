@@ -1,8 +1,8 @@
-const BASE_URL = 'https://api.financialdatasets.ai';
+const BASE_URL = "https://api.financialdatasets.ai";
 
 export async function callApi(
   endpoint: string,
-  params: Record<string, string | number | string[] | undefined>
+  params: Record<string, string | number | string[] | null | undefined>,
 ): Promise<Record<string, unknown>> {
   // Read API key lazily at call time (after dotenv has loaded)
   const FINANCIAL_DATASETS_API_KEY = process.env.FINANCIAL_DATASETS_API_KEY;
@@ -21,14 +21,15 @@ export async function callApi(
 
   const response = await fetch(url.toString(), {
     headers: {
-      'x-api-key': FINANCIAL_DATASETS_API_KEY || '',
+      "x-api-key": FINANCIAL_DATASETS_API_KEY || "",
     },
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}`,
+    );
   }
 
   return response.json();
 }
-
