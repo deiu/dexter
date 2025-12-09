@@ -1,10 +1,70 @@
 import { StateGraph, MemorySaver } from "@langchain/langgraph";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { AIMessage, BaseMessage, ToolMessage } from "@langchain/core/messages";
+import {
+  AIMessage,
+  BaseMessage,
+  ToolMessage,
+  HumanMessage,
+} from "@langchain/core/messages";
 import { ChatOpenAI, ChatOpenAICallOptions } from "@langchain/openai";
 import { DexterAnnotation, DEFAULT_MODEL, MAX_ITERATIONS } from "./state.js";
 import { LANGCHAIN_TOOLS } from "./tools.js";
 import { AGENT_SYSTEM_PROMPT } from "./prompts.js";
+
+/**
+ * Hardcoded responses for common questions
+ */
+const ABOUT_RESPONSE = `I'm **Dexter**, your financial research assistant. I help you analyze companies, compare stocks, and understand financial data.
+
+## What I Can Do
+
+**Company Financials**
+- Income statements, balance sheets, cash flow statements
+- Financial metrics (P/E ratio, margins, growth rates)
+- Segmented revenue breakdowns by product/region
+
+**Market Data**
+- Stock prices (current and historical)
+- Cryptocurrency prices (BTC, ETH, SOL, etc.)
+- Analyst estimates and price targets
+
+**SEC Filings**
+- 10-K annual reports
+- 10-Q quarterly reports
+- 8-K current reports (earnings, acquisitions, etc.)
+
+**Ownership & Trading**
+- Insider trades (executive buys/sells)
+- Institutional ownership (hedge funds, mutual funds)
+
+**News & Research**
+- Company news
+- Google News search
+
+## Example Questions
+
+- "Compare Apple and Microsoft's profitability"
+- "What's Tesla's revenue breakdown by segment?"
+- "Show me insider trades for NVDA in the last 3 months"
+- "What's Bitcoin's price trend this year?"
+- "Summarize Amazon's latest 10-K risk factors"
+
+Just ask me anything about a company or stock!`;
+
+/**
+ * Check if message is asking about capabilities
+ */
+function isAboutQuestion(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  const patterns = [
+    /^(what can you do|what do you do)/,
+    /^(tell me about yourself|who are you|what are you)/,
+    /^(help|how can you help)/,
+    /^(what are your capabilities|what can i ask)/,
+    /^hi$|^hello$|^hey$/,
+  ];
+  return patterns.some((p) => p.test(lower));
+}
 
 /**
  * Custom ChatOpenAI that strips unsupported parameters for Grok models
@@ -24,6 +84,54 @@ class ChatGrok extends ChatOpenAI {
 
 // Track iterations to prevent runaway loops
 let iterationCount = 0;
+
+/**
+ * Handle hardcoded responses for common questions
+ */
+function handleHardcodedResponse(state: typeof DexterAnnotation.State): {
+  messages: BaseMessage[];
+} | null {
+  const messages = state.messages;
+  const lastMessage = messages[messages.length - 1];
+
+  // Only check human messages
+  if (
+    !(lastMessage instanceof HumanMessage) &&
+    lastMessage._getType() !== "human"
+  ) {
+    return null;
+  }
+
+  const content = lastMessage.content;
+  const text = typeof content === "string" ? content : JSON.stringify(content);
+
+  if (isAboutQuestion(text)) {
+    return {
+      messages: [new AIMessage({ content: ABOUT_RESPONSE })],
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Router: check for hardcoded responses first
+ */
+function routeInput(
+  state: typeof DexterAnnotation.State,
+): "hardcoded" | "agent" {
+  const hardcoded = handleHardcodedResponse(state);
+  return hardcoded ? "hardcoded" : "agent";
+}
+
+/**
+ * Return hardcoded response
+ */
+function returnHardcodedResponse(state: typeof DexterAnnotation.State): {
+  messages: BaseMessage[];
+} {
+  return handleHardcodedResponse(state) || { messages: [] };
+}
 
 /**
  * Call the model with tools bound
@@ -159,19 +267,26 @@ function summarizeToolResults(state: typeof DexterAnnotation.State): {
 /**
  * Dexter Financial Research Agent
  *
- * Simple ReAct pattern:
- * 1. Agent receives message, decides what tools to call
- * 2. Tools execute and return results
- * 3. Progress node summarizes what was retrieved
- * 4. Agent loops until it has enough info to respond
- * 5. Max 10 iterations to control costs
+ * Flow:
+ * 1. Router checks for hardcoded responses (greetings, "what can you do", etc.)
+ * 2. If hardcoded, return immediately
+ * 3. Otherwise, agent decides what tools to call
+ * 4. Tools execute and return results
+ * 5. Progress node summarizes what was retrieved
+ * 6. Agent loops until it has enough info to respond
+ * 7. Max 10 iterations to control costs
  */
 const workflow = new StateGraph(DexterAnnotation)
+  .addNode("hardcoded", returnHardcodedResponse)
   .addNode("agent", callModel)
   .addNode("announce", announceToolCalls)
   .addNode("tools", toolNode)
   .addNode("progress", summarizeToolResults)
-  .addEdge("__start__", "agent")
+  .addConditionalEdges("__start__", routeInput, {
+    hardcoded: "hardcoded",
+    agent: "agent",
+  })
+  .addEdge("hardcoded", "__end__")
   .addConditionalEdges("agent", routeModelOutput, {
     tools: "announce",
     __end__: "__end__",

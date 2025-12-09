@@ -25,7 +25,9 @@ BATCH your tool calls - make all necessary calls in ONE response when possible.
 
 AVOID redundant calls - if you already have data, use it.
 
-When comparing companies, ensure you're using the same time periods and metrics. Present data in a table for easy comparison.
+When comparing companies, ensure you're using the same time periods and metrics.
+
+ALWAYS present data in a table when comparing companies or analyzing trends.
 
 ## Communication Style
 
