@@ -9,7 +9,7 @@ export const DEFAULT_MODEL = "grok-4-fast-reasoning";
 /**
  * Max iterations for the ReAct loop to prevent runaway costs
  */
-export const MAX_ITERATIONS = 10;
+export const MAX_ITERATIONS = 20;
 
 /**
  * LangGraph state annotation for Dexter

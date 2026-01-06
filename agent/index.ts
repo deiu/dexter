@@ -97,7 +97,7 @@ function handleHardcodedResponse(state: typeof DexterAnnotation.State): {
   // Only check human messages
   if (
     !(lastMessage instanceof HumanMessage) &&
-    lastMessage._getType() !== "human"
+    lastMessage.getType() !== "human"
   ) {
     return null;
   }
@@ -212,14 +212,7 @@ function announceToolCalls(state: typeof DexterAnnotation.State): {
     return { messages: [] };
   }
 
-  // Extract tool names and make them readable
-  const toolNames = toolCalls.map((tc) => {
-    const name = tc.name || "unknown";
-    return name.replace(/_/g, " ").replace(/^get /, "");
-  });
-
-  const uniqueTools = [...new Set(toolNames)];
-  const announcement = `🔍 Fetching: ${uniqueTools.join(", ")}...`;
+  const announcement = `🔍 Researching...`;
 
   return {
     messages: [new AIMessage({ content: announcement })],
@@ -249,15 +242,7 @@ function summarizeToolResults(state: typeof DexterAnnotation.State): {
     return { messages: [] };
   }
 
-  // Create a brief summary of what was retrieved
-  const toolNames = toolMessages.map((tm) => {
-    const name = tm.name || "unknown";
-    // Make tool names more readable
-    return name.replace(/_/g, " ").replace(/^get /, "");
-  });
-
-  const uniqueTools = [...new Set(toolNames)];
-  const summary = `✓ Retrieved: ${uniqueTools.join(", ")}. Analyzing...`;
+  const summary = `✓ Data retrieved. Analyzing...`;
 
   return {
     messages: [new AIMessage({ content: summary })],

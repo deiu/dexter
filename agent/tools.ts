@@ -1,59 +1,11 @@
 import { StructuredToolInterface } from "@langchain/core/tools";
 import type { ToolDefinition } from "./llm.js";
-import {
-  getIncomeStatements,
-  getBalanceSheets,
-  getCashFlowStatements,
-  getAllFinancialStatements,
-  getFilings,
-  get10KFilingItems,
-  get10QFilingItems,
-  get8KFilingItems,
-  getPriceSnapshot,
-  getPrices,
-  getFinancialMetricsSnapshot,
-  getFinancialMetrics,
-  getNews,
-  getAnalystEstimates,
-  getSegmentedRevenues,
-  getInsiderTrades,
-  getInstitutionalOwnership,
-  getCompanyFacts,
-  getEarningsPressReleases,
-  searchLineItems,
-  searchFinancials,
-  getCryptoPrices,
-} from "../src/tools/finance/index.js";
-import { searchGoogleNews } from "../src/tools/search/index.js";
+import { searchPerplexity } from "../src/tools/search/index.js";
 
 /**
  * LangChain tools (for execution)
  */
-export const LANGCHAIN_TOOLS: StructuredToolInterface[] = [
-  getIncomeStatements,
-  getBalanceSheets,
-  getCashFlowStatements,
-  getAllFinancialStatements,
-  get10KFilingItems,
-  get10QFilingItems,
-  get8KFilingItems,
-  getFilings,
-  getPriceSnapshot,
-  getPrices,
-  getFinancialMetricsSnapshot,
-  getFinancialMetrics,
-  getNews,
-  getAnalystEstimates,
-  getSegmentedRevenues,
-  getInsiderTrades,
-  getInstitutionalOwnership,
-  getCompanyFacts,
-  getEarningsPressReleases,
-  searchLineItems,
-  searchFinancials,
-  getCryptoPrices,
-  searchGoogleNews,
-];
+export const LANGCHAIN_TOOLS: StructuredToolInterface[] = [searchPerplexity];
 
 /**
  * Tool definitions for OpenAI function calling
