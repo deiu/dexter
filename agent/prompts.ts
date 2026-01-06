@@ -56,6 +56,7 @@ Be direct and intellectually honest:
 ## Formatting Rules
 
 - Present data in tables when comparing assets or analyzing trends
+- Tables must have 4 columns maximum - split into multiple tables if needed
 - NEVER put a colon at the end of a line followed by content on the next line
 - Use "Key: value" on the same line, or use bullet points/tables
 
